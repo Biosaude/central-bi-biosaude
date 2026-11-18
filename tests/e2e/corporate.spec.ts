@@ -37,6 +37,65 @@ test("isola dashboards e aplica revogação, gestão e logout nas rotas reais", 
     await page.goto(origin + "/gerenciamento/usuarios");
     await expect(page.getByRole("heading", { name: "Acesso negado" })).toBeVisible();
 
+    await test.step("abre o Comercial autorizado e bloqueia os demais acessos e destinos", async () => {
+      const commercialSlug = "painel-comercial-r1";
+      const commercialUrl = "https://movopainelcomercial.vercel.app/";
+      const route = origin + "/dashboards/" + commercialSlug;
+      const commercial = await fixture.dashboards.create({
+        slug: commercialSlug,
+        name: "Dashboard Comercial",
+        description: "Registro sintético com o identificador já utilizado na Central",
+        icon: "chart",
+        category: "Comercial",
+        displayOrder: 30,
+        active: true,
+        integrationType: "pending",
+      }, "fixture");
+      await fixture.pool.query(`INSERT INTO central_bi.user_dashboards (user_id, dashboard_id, permission_id)
+        VALUES ($1,$2,'dashboard:read')`, [firstUserId, commercial.id]);
+
+      await page.goto(origin + "/dashboards");
+      const card = page.locator("article", { has: page.getByRole("heading", { name: "Dashboard Comercial" }) });
+      await card.getByRole("link", { name: "Explorar módulo" }).click();
+      await expect(page).toHaveURL(route);
+      const open = page.getByRole("link", { name: "Abrir Dashboard Comercial" });
+      await expect(open).toHaveAttribute("href", commercialUrl);
+      await expect(page.getByText(/A URL direta, as APIs e as RPCs do Comercial/)).toBeVisible();
+      await expect(page.locator("iframe")).toHaveCount(0);
+
+      const invalid = encodeURIComponent("https://evil.example.invalid/");
+      await page.goto(`${route}?next=${invalid}&url=${invalid}&redirect=${invalid}`);
+      await expect(open).toHaveAttribute("href", commercialUrl);
+      const navigation = page.waitForRequest(commercialUrl);
+      await page.route(commercialUrl, (intercept) => intercept.fulfill({ body: "Aplicativo Comercial simulado" }));
+      await open.click();
+      expect((await navigation).headers().referer).toBeUndefined();
+      await expect(page).toHaveURL(commercialUrl);
+
+      const anonymous = await browser.newContext();
+      try {
+        const publicPage = await anonymous.newPage();
+        await publicPage.goto(route);
+        await expect(publicPage.getByRole("heading", { name: "Acesso negado" })).toBeVisible();
+        await expect(publicPage.getByRole("link", { name: "Abrir Dashboard Comercial" })).toHaveCount(0);
+      } finally {
+        await anonymous.close();
+      }
+
+      for (const unauthorized of [beta, admin]) {
+        const response = await unauthorized.request.get(route, { maxRedirects: 0 });
+        expect(response.status()).toBe(404);
+        expect(await response.text()).not.toContain(commercialUrl);
+      }
+
+      await page.goto(origin + "/dashboards/acesso-alfa?slug=" + commercialSlug);
+      await expect(open).toHaveCount(0);
+      await fixture.pool.query("UPDATE central_bi.dashboards SET active=false WHERE id=$1", [commercial.id]);
+      const inactive = await alpha.request.get(route, { maxRedirects: 0 });
+      expect(inactive.status()).toBe(404);
+      expect(await inactive.text()).not.toContain(commercialUrl);
+    });
+
     const administrator = await admin.newPage();
     await administrator.goto(origin + "/gerenciamento/usuarios");
     const alphaCard = administrator.locator("section", { has: administrator.getByRole("heading", { name: "Pessoa Alfa", exact: true }) });

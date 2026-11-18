@@ -94,3 +94,9 @@ O modo corporativo é ativado com `PORTAL_AUTH_MODE=entra` e usa PostgreSQL. O d
 4. Testes de PostgreSQL em `npm test` usam `PG_TEST_DATABASE_URL` (banco `central_bi_local`) e `PG_AUTH_TEST_DATABASE_URL` (banco `central_bi_auth_local`). O cenário corporativo de `npm run test:e2e` usa `PG_CORPORATE_E2E_DATABASE_URL` (banco `central_bi_e2e_local`). Use bancos vazios e descartáveis em `127.0.0.1` a cada execução. O login é verificado com provedor simulado nos testes OIDC e a sessão é criada com identidades sintéticas no Playwright.
 
 Para preparar o Neon de homologação, siga o [procedimento de banco e identidade](docs/homologacao-neon.md).
+
+### Abertura do Dashboard Comercial
+
+Na Central, o módulo ativo `painel-comercial-r1` oferece **Abrir Dashboard Comercial** após a autenticação Entra e a validação da concessão individual de leitura. O destino é fixo no código da rota: `https://movopainelcomercial.vercel.app/`. O cadastro existente é reutilizado. A aplicação original abre diretamente no navegador, sem iframe e sem compartilhar a sessão da Central.
+
+A ação protege somente a abertura pela Central. Ela ainda não impõe autenticação corporativa nem verifica concessões da Central na URL direta, nas APIs ou nas RPCs do Comercial. Esses acessos seguem as políticas do Comercial. Antes da liberação corporativa definitiva, valide em homologação a identidade e a concessão no backend do Comercial e nas interfaces de leitura de dados, preservando a autorização própria de publicação.
