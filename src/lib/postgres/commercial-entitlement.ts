@@ -9,7 +9,7 @@ export type CommercialEntitlementAssertion = {
   expiresAt: number;
 };
 
-export async function checkCommercialEntitlement(pool: Pool, assertion: CommercialEntitlementAssertion) {
+export async function checkCommercialEntitlement(pool: Pool, assertion: CommercialEntitlementAssertion, dashboardSlug = commercialDashboardSlug) {
   const { rows: [decision] } = await pool.query<{ accepted: boolean; allowed: boolean }>(
     `WITH expired AS (
        DELETE FROM central_bi.commercial_entitlement_assertions
@@ -29,7 +29,7 @@ export async function checkCommercialEntitlement(pool: Pool, assertion: Commerci
          JOIN central_bi.user_dashboards g ON g.user_id=u.id AND g.permission_id='dashboard:read'
          JOIN central_bi.dashboards d ON d.id=g.dashboard_id AND d.slug=$5 AND d.active
        ) AS allowed`,
-    [assertion.jti, assertion.expiresAt, assertion.tenantId, assertion.objectId, commercialDashboardSlug],
+    [assertion.jti, assertion.expiresAt, assertion.tenantId, assertion.objectId, dashboardSlug],
   );
   return decision;
 }

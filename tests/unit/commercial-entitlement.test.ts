@@ -1,7 +1,7 @@
 import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { SignJWT, type JWTPayload } from "jose";
 import { describe, expect, it, vi } from "vitest";
-import { handleCommercialEntitlement } from "../../src/lib/commercial-entitlement";
+import { handleCommercialEntitlement, handleRetentionEntitlement, handleGlobalLimitEntitlement } from "../../src/lib/commercial-entitlement";
 import { firstObjectId, tenantId } from "../fixtures/corporate";
 
 const endpoint = "https://central-preview.example.invalid/api/internal/commercial-entitlement";
@@ -111,5 +111,32 @@ describe("endpoint interno de concessão do Comercial", () => {
       { ...env, CENTRAL_BI_ASSERTION_PUBLIC_KEY: undefined },
     )).status).toBe(503);
     expect(lookup).not.toHaveBeenCalled();
+  });
+});
+
+describe("isolamento de concessões entre serviços", () => {
+  it.each([
+    ["RETENTION", "retention", "biosaude-retention", "retencao-faturamento", handleRetentionEntitlement],
+    ["GLOBAL_LIMIT", "global-limit", "biosaude-global-limit", "limite-global-cliente", handleGlobalLimitEntitlement],
+  ] as const)("valida apenas o escopo de %s", async (prefix, path, issuer, slug, handle) => {
+    const newKeys = generateKeyPairSync("ed25519");
+    const audience = new URL("/api/internal/" + path + "-entitlement", endpoint).href;
+    const config = { ...env,
+      [prefix + "_CENTRAL_BI_ENTITLEMENT_URL"]: audience,
+      [prefix + "_CENTRAL_BI_ASSERTION_KEY_ID"]: "another-kid",
+      [prefix + "_CENTRAL_BI_ASSERTION_PUBLIC_KEY"]: newKeys.publicKey.export({ type: "spki", format: "pem" }).toString(),
+    };
+    const claims = { aud: audience, iss: issuer, sub: issuer, dashboard: slug };
+    const lookup = vi.fn().mockResolvedValue({ accepted: true, allowed: true });
+    const invalid = [
+      await signAssertion(claims, keys.privateKey, "another-kid"),
+      await signAssertion({ ...claims, dashboard: "painel-comercial-r1" }, newKeys.privateKey, "another-kid"),
+      await signAssertion({ ...claims, iss: service }, newKeys.privateKey, "another-kid"),
+    ];
+    for (const token of invalid) expect((await handle(request(token, audience), lookup, config)).status).toBe(401);
+    expect(lookup).not.toHaveBeenCalled();
+    const valid = await signAssertion(claims, newKeys.privateKey, "another-kid");
+    expect((await handle(request(valid, audience), lookup, config)).status).toBe(200);
+    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ tenantId, objectId: firstObjectId }), slug);
   });
 });

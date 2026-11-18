@@ -6,8 +6,7 @@ import { PageHeading, Status } from "@/components/ui";
 import { DashboardIcon } from "@/components/icons";
 import { portalAccess, portalDashboard } from "@/lib/page-access";
 
-const commercialSlug = "painel-comercial-r1";
-const commercialUrl = "https://movopainelcomercial.vercel.app/";
+import { dashboardLaunch } from "@/lib/dashboard-launch";
 
 export default async function DashboardPage({
   params,
@@ -19,7 +18,7 @@ export default async function DashboardPage({
   const { slug } = await params;
   const d = await portalDashboard(access, slug);
   if (!d || !d.active) notFound();
-  const showCommercial = access.kind === "entra" && d.slug === commercialSlug;
+  const launch = access.kind === "entra" ? dashboardLaunch(d.slug) : undefined;
   return (
     <>
       <Link className="back-link" href="/dashboards">
@@ -36,20 +35,24 @@ export default async function DashboardPage({
         <span className="large-module-icon">
           <DashboardIcon name={d.icon} size={40} />
         </span>
-        {showCommercial ? (
+        {launch ? (
           <>
-            <p>
-              A concessão da Central controla a abertura por esta página. A URL
-              direta, as APIs e as RPCs do Comercial seguem as políticas do
-              sistema original, que ainda não aplica o login corporativo da
-              Central a esses acessos.
-            </p>
+            {launch.preview ? (
+              <p>O aplicativo de homologação verifica a sessão corporativa e a concessão de leitura.</p>
+            ) : (
+              <p>
+                A concessão da Central controla a abertura por esta página. A URL
+                direta, as APIs e as RPCs do Comercial seguem as políticas do
+                sistema original, que ainda não aplica o login corporativo da
+                Central a esses acessos.
+              </p>
+            )}
             <a
               className="button primary"
-              href={commercialUrl}
+              href={launch.href}
               referrerPolicy="no-referrer"
             >
-              Abrir Dashboard Comercial{" "}
+              {launch.label}{" "}
               <ArrowUpRight size={17} aria-hidden="true" />
             </a>
           </>
@@ -85,10 +88,10 @@ export default async function DashboardPage({
             </div>
             <div>
               <dt>
-                {showCommercial ? "Tipo de integração" : "Tipo de integração futura"}
+                {launch ? "Tipo de integração" : "Tipo de integração futura"}
               </dt>
               <dd>
-                {showCommercial
+                {launch
                   ? "Aplicação externa"
                   : {
                       pending: "A definir",
@@ -104,8 +107,8 @@ export default async function DashboardPage({
           <span className="eyebrow">{access.kind === "demo" ? "AMBIENTE DE DEMONSTRAÇÃO" : "ACESSO INDIVIDUAL"}</span>
           <h3>Segurança desde o primeiro passo.</h3>
           <p className="muted">
-            {showCommercial
-              ? "Os dados e as operações comerciais permanecem no aplicativo original."
+            {launch
+              ? "Os dados e as operações permanecem no aplicativo de destino."
               : "Sem iframes, URLs externas ou dados financeiros reais."}
           </p>
         </div>

@@ -19,7 +19,7 @@ As respostas usam `Cache-Control: private, no-store`. Cada pedido com uma asser�
 
 - No servidor da Central, configure `PORTAL_AUTH_MODE=entra`, `ENTRA_TENANT_ID` e a `DATABASE_URL` de homologação com o papel já definido `central_bi_runtime`. As variáveis HTTPS abaixo devem ser específicas do Preview. Para testes locais, o endpoint pode usar `http://localhost` com a porta do servidor.
 - Use o mesmo `CENTRAL_BI_ENTITLEMENT_URL` e `CENTRAL_BI_ASSERTION_KEY_ID` no Comercial e na Central. A URL deve apontar para o host canônico exato do Preview. Configure `CENTRAL_BI_ASSERTION_PUBLIC_KEY` na Central com a chave pública PEM SPKI Ed25519. A chave privada pertence somente ao servidor do Comercial.
-- Em uma janela autorizada, aplique `003_commercial_entitlement_replay.sql` pelo executor de migrações de homologação e reaplique `db/operations/homologacao-runtime.sql`. O papel de execução continua sem DDL. Na tabela de controle de replay, ele recebe inserção, exclusão e leitura apenas da expiração.
-- Confira a conectividade do servidor Comercial com o Preview da Central, inclusive a proteção de implantação. Exercite a concessão, a revogação e a indisponibilidade com contas de teste. A leitura direta do Supabase depende de proteção em etapa separada.
+- A migração `003_commercial_entitlement_replay.sql` e os privilégios necessários foram informados como aplicados no Neon de homologação `jolly-block-83042154`. Use a tabela e o papel existentes.
+- Consulte o [checklist consolidado](homologacao-dashboards.md) para a validação do acesso direto no Supabase, roteamento e conectividade de Preview.
 
 Para desativar a integração em homologação, remova `CENTRAL_BI_ENTITLEMENT_URL` dessa configuração. O catálogo e as rotas corporativas da Central continuam independentes do endpoint.
