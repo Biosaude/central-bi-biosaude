@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { createPostgresPool } from "../src/lib/postgres/connection.ts";
+import { createMigrationPool } from "../src/lib/postgres/connection.ts";
 import { inTransaction } from "../src/lib/postgres/transaction.ts";
 import { writeAudit } from "../src/lib/postgres/identity.ts";
 
@@ -22,7 +22,7 @@ if (!input.success) {
 } else {
   const { tenant, object, name, email } = input.data;
   try {
-    const pool = createPostgresPool();
+    const pool = createMigrationPool();
     try {
       const created = await inTransaction(pool, async (db) => {
         await db.query("LOCK TABLE central_bi.users IN SHARE ROW EXCLUSIVE MODE");

@@ -1,8 +1,8 @@
-import { createPostgresPool } from "../src/lib/postgres/connection.ts";
+import { createMigrationPool } from "../src/lib/postgres/connection.ts";
 import { migratePostgres } from "../src/lib/postgres/migrations.ts";
 
 try {
-  const pool = createPostgresPool();
+  const pool = createMigrationPool();
   try {
     const applied = await migratePostgres(pool);
     console.log(applied.length ? `Migrações aplicadas: ${applied.join(", ")}` : "Banco atualizado.");

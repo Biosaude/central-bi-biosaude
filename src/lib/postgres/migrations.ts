@@ -15,7 +15,10 @@ export async function migratePostgres(pool: Pool) {
   );
   return inTransaction(pool, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(630188410420::bigint)");
-    await client.query("CREATE SCHEMA IF NOT EXISTS central_bi");
+    const { rows: [{ exists }] } = await client.query<{ exists: boolean }>(
+      "SELECT to_regnamespace('central_bi') IS NOT NULL AS exists",
+    );
+    if (!exists) await client.query("CREATE SCHEMA central_bi");
     await client.query(`
       CREATE TABLE IF NOT EXISTS central_bi.schema_migrations (
         name text PRIMARY KEY,
