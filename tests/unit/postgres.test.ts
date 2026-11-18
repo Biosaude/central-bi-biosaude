@@ -28,7 +28,7 @@ describe("PostgreSQL local", () => {
       expect(Number(version)).toBeGreaterThanOrEqual(180000);
       expect(Number(version)).toBeLessThan(190000);
       const migrations = await Promise.all([migratePostgres(pool), migratePostgres(pool)]);
-      expect(migrations.flat()).toEqual(["001_initial.sql", "002_corporate_access.sql"]);
+      expect(migrations.flat()).toEqual(["001_initial.sql", "002_corporate_access.sql", "003_commercial_entitlement_replay.sql"]);
       await expect(migratePostgres(pool)).resolves.toEqual([]);
 
       const repository = new PostgresDashboardRepository(pool);
