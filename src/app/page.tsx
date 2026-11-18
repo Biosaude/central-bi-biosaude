@@ -1,3 +1,4 @@
+import { Denied } from "@/components/access-denied";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,15 +13,14 @@ import {
 import {
   DashboardCard,
   DemoNotice,
-  Denied,
   PageHeading,
 } from "@/components/ui";
-import { getRepository } from "@/lib/sqlite";
-import { localDemoAllowed } from "@/lib/page-access";
+import { canManage, portalAccess, portalDashboards } from "@/lib/page-access";
 
 export default async function Home() {
-  if (!(await localDemoAllowed())) return <Denied />;
-  const all = getRepository().list(true);
+  const access = await portalAccess();
+  if (access.kind === "denied") return <Denied />;
+  const all = await portalDashboards(access, access.kind === "demo");
   const active = all.filter((d) => d.active);
   return (
     <>
@@ -110,7 +110,7 @@ export default async function Home() {
               <span>
                 {stat.label === "Integrações conectadas"
                   ? "Em preparação"
-                  : "Demonstração"}
+                  : access.kind === "demo" ? "Demonstração" : "Seus módulos"}
               </span>
             </div>
             <p>{stat.foot}</p>
@@ -166,7 +166,7 @@ export default async function Home() {
               title: "Configurações da central",
               description: "Consulte o ambiente e as integrações",
             },
-          ].map((item) => (
+          ].filter((item) => canManage(access) || item.href === "/configuracoes").map((item) => (
             <Link className="quick-card" href={item.href} key={item.href}>
               <item.icon size={20} />
               <div>
@@ -178,7 +178,7 @@ export default async function Home() {
           ))}
         </div>
       </section>
-      <DemoNotice />
+      {access.kind === "demo" && <DemoNotice />}
     </>
   );
 }

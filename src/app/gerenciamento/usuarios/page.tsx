@@ -1,10 +1,28 @@
+import { Denied } from "@/components/access-denied";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
-import { PageHeading, Denied } from "@/components/ui";
-import { localDemoAllowed } from "@/lib/page-access";
+import { PageHeading } from "@/components/ui";
+import { canManage, portalAccess, portalDashboards } from "@/lib/page-access";
+import { AccessManagement } from "@/components/access-management";
+import { corporateServices } from "@/lib/corporate";
+import { listManagedUsers } from "@/lib/postgres/administration";
 import { getRepository } from "@/lib/sqlite";
 export const metadata = { title: "Usuários e permissões" };
 export default async function UsersPage() {
-  if (!(await localDemoAllowed())) return <Denied />;
+  const access = await portalAccess();
+  if (!canManage(access)) return <Denied />;
+  if (access.kind === "entra") {
+    const [users, dashboards] = await Promise.all([
+      listManagedUsers(corporateServices().pool, access.principal.tenantId),
+      portalDashboards(access, true),
+    ]);
+    return (
+      <>
+        <PageHeading eyebrow="GERENCIAMENTO" title="Usuários e permissões"
+          description="Gerencie vínculos do Entra ID, concessões individuais e sessões." />
+        <AccessManagement users={users} dashboards={dashboards} currentUserId={access.principal.id} />
+      </>
+    );
+  }
   const repo = getRepository();
   const users = repo.listUsers();
   const grants = repo.listDemonstrativeGrants();

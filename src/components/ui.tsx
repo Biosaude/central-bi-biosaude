@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, LockKeyhole, ArrowRight, Clock3 } from "lucide-react";
+import { ArrowUpRight, LockKeyhole, Clock3 } from "lucide-react";
 import type { Dashboard } from "@/lib/domain";
 import { DashboardIcon } from "./icons";
 
@@ -69,25 +69,6 @@ export function DemoNotice() {
         </p>
       </div>
       <span className="phase-tag">FASE 02</span>
-    </div>
-  );
-}
-export function Denied() {
-  return (
-    <div className="denied">
-      <span className="module-icon">
-        <LockKeyhole size={30} />
-      </span>
-      <div className="eyebrow">ACESSO RESTRITO</div>
-      <h1>Acesso negado</h1>
-      <p>
-        Esta funcionalidade está disponível apenas na demonstração local
-        autorizada. A autenticação corporativa será implementada na Fase 3.
-      </p>
-      <p>Não há sessão de usuário autenticada nem acesso a dados reais.</p>
-      <Link className="button secondary" href="/acesso-negado">
-        Informações de acesso <ArrowRight size={16} />
-      </Link>
     </div>
   );
 }

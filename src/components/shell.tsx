@@ -35,11 +35,13 @@ const navigation = [
 export function Shell({
   children,
   dashboards,
-  enabled,
+  mode,
+  canManage,
 }: {
   children: React.ReactNode;
   dashboards: Dashboard[];
-  enabled: boolean;
+  mode: "denied" | "demo" | "entra";
+  canManage: boolean;
 }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -72,7 +74,7 @@ export function Shell({
           WORKSPACE <span className="workspace-indicator" />
         </div>
         <nav aria-label="Navegação principal">
-          {navigation.map((item, index) => (
+          {navigation.map((item, index) => (!canManage && item.href.startsWith("/gerenciamento/") && mode === "entra") ? null : (
             <div key={item.href}>
               {index === 2 && (
                 <div className="sidebar-label management-label">
@@ -116,7 +118,7 @@ export function Shell({
         <div className="sidebar-bottom">
           <div className="local-tag">
             <span className="status-dot" />
-            {enabled ? "Ambiente local" : "Acesso restrito"}
+            {mode === "demo" ? "Ambiente local" : mode === "entra" ? "Ambiente corporativo" : "Acesso restrito"}
           </div>
           <p>
             Inteligência que conecta
@@ -124,7 +126,7 @@ export function Shell({
             cuidado e decisão.
           </p>
           <div className="sidebar-version">
-            CENTRAL DE BI <span>v0.1 · Fase 2</span>
+            CENTRAL DE BI <span>{mode === "entra" ? "Fase 4D" : "v0.1 · Fase 2"}</span>
           </div>
         </div>
       </aside>
@@ -146,15 +148,19 @@ export function Shell({
           <div className="topbar-right">
             <span className="demo-pill">
               <span className="status-dot" />
-              Demonstração local
+              {mode === "entra" ? "Sessão corporativa" : "Demonstração local"}
             </span>
             <span className="header-divider" />
-            <div
+            {mode === "entra" ? (
+              <form action="/api/auth/logout" method="post">
+                <button type="submit" className="button secondary">Sair</button>
+              </form>
+            ) : <div
               className="environment-avatar"
               title="Ambiente de desenvolvimento, sem usuário autenticado"
             >
               <LockKeyhole size={18} />
-            </div>
+            </div>}
           </div>
         </header>
         <main id="conteudo" tabIndex={-1}>
@@ -163,7 +169,7 @@ export function Shell({
         <footer className="footer">
           <span>© {new Date().getFullYear()} Biosaúde · Central de BI</span>
           <span>
-            Dados fictícios <span className="footer-dot">·</span> Integrações
+            {mode !== "entra" && <>Dados fictícios <span className="footer-dot">·</span> </>}Integrações
             pendentes <ArrowUpRight size={13} />
           </span>
         </footer>

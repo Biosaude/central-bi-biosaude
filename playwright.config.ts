@@ -2,9 +2,12 @@ import { defineConfig } from "@playwright/test";
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { clientId, tenantId } from "./tests/fixtures/corporate";
+const corporateDb = process.env.PG_CORPORATE_E2E_DATABASE_URL;
 const db = join(mkdtempSync(join(tmpdir(), "biosaude-e2e-")), "portal.sqlite");
 export default defineConfig({
   testDir: "tests/e2e",
+  testIgnore: corporateDb ? undefined : "**/corporate.spec.ts",
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -34,5 +37,19 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120000,
     },
+    ...(corporateDb ? [{
+      command: "npm run start -- --port 3004",
+      url: "http://localhost:3004",
+      env: {
+        PORTAL_AUTH_MODE: "entra",
+        DATABASE_URL: corporateDb,
+        ENTRA_TENANT_ID: tenantId,
+        ENTRA_CLIENT_ID: clientId,
+        ENTRA_CLIENT_SECRET: "fixture-only",
+        ENTRA_REDIRECT_URI: "http://localhost:3004/api/auth/callback",
+      },
+      reuseExistingServer: false,
+      timeout: 120000,
+    }] : []),
   ],
 });

@@ -1,18 +1,19 @@
+import { Denied } from "@/components/access-denied";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, PlugZap, Clock3 } from "lucide-react";
-import { PageHeading, Denied, Status } from "@/components/ui";
+import { PageHeading, Status } from "@/components/ui";
 import { DashboardIcon } from "@/components/icons";
-import { localDemoAllowed } from "@/lib/page-access";
-import { getRepository } from "@/lib/sqlite";
+import { portalAccess, portalDashboard } from "@/lib/page-access";
 export default async function DashboardPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  if (!(await localDemoAllowed())) return <Denied />;
+  const access = await portalAccess();
+  if (access.kind === "denied") return <Denied />;
   const { slug } = await params;
-  const d = getRepository().find(slug);
+  const d = await portalDashboard(access, slug);
   if (!d || !d.active) notFound();
   return (
     <>
@@ -72,12 +73,10 @@ export default async function DashboardPage({
           </dl>
         </div>
         <div className="panel">
-          <span className="eyebrow">AMBIENTE DE DEMONSTRAÇÃO</span>
+          <span className="eyebrow">{access.kind === "demo" ? "AMBIENTE DE DEMONSTRAÇÃO" : "ACESSO INDIVIDUAL"}</span>
           <h3>Segurança desde o primeiro passo.</h3>
           <p className="muted">
-            Sem iframes, URLs externas ou dados financeiros reais. A
-            autenticação centralizada e os acessos individuais serão
-            implementados na Fase 3.
+            Sem iframes, URLs externas ou dados financeiros reais.
           </p>
         </div>
       </div>

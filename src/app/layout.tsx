@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Shell } from "@/components/shell";
-import { localDemoAllowed } from "@/lib/page-access";
-import { getRepository } from "@/lib/sqlite";
+import { canManage, portalAccess, portalDashboards } from "@/lib/page-access";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,12 +18,12 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const enabled = await localDemoAllowed();
-  const dashboards = enabled ? getRepository().list() : [];
+  const access = await portalAccess();
+  const dashboards = await portalDashboards(access);
   return (
     <html lang="pt-BR">
       <body>
-        <Shell dashboards={dashboards} enabled={enabled}>
+        <Shell dashboards={dashboards} mode={access.kind} canManage={canManage(access)}>
           {children}
         </Shell>
       </body>

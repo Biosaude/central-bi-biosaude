@@ -1,9 +1,12 @@
+import { Denied } from "@/components/access-denied";
 import { Database, PlugZap, LockKeyhole, Monitor } from "lucide-react";
-import { PageHeading, Denied } from "@/components/ui";
-import { localDemoAllowed } from "@/lib/page-access";
+import { PageHeading } from "@/components/ui";
+import { portalAccess } from "@/lib/page-access";
 export const metadata = { title: "Configurações" };
 export default async function SettingsPage() {
-  if (!(await localDemoAllowed())) return <Denied />;
+  const access = await portalAccess();
+  if (access.kind === "denied") return <Denied />;
+  const demo = access.kind === "demo";
   return (
     <>
       <PageHeading
@@ -17,17 +20,17 @@ export default async function SettingsPage() {
             icon: Monitor,
             title: "Ambiente",
             items: [
-              ["Modo", "Desenvolvimento local"],
-              ["Dados", "Exclusivamente fictícios"],
-              ["Versão", "0.1 · Fase 2"],
+              ["Modo", demo ? "Desenvolvimento local" : "Corporativo"],
+              ["Dados", demo ? "Exclusivamente fictícios" : "Dados da Central"],
+              ["Versão", demo ? "0.1 · Fase 2" : "Fase 4D"],
             ],
           },
           {
             icon: Database,
             title: "Persistência",
             items: [
-              ["Banco atual", "SQLite local"],
-              ["Modelo futuro", "PostgreSQL / Neon"],
+              ["Banco atual", demo ? "SQLite local" : "PostgreSQL"],
+
               ["Bancos externos", "Nenhum banco conectado"],
             ],
           },
@@ -35,8 +38,8 @@ export default async function SettingsPage() {
             icon: LockKeyhole,
             title: "Identidade e acesso",
             items: [
-              ["Autenticação", "Não implementada · Fase 3"],
-              ["Provedor previsto", "OIDC corporativo"],
+              ["Autenticação", demo ? "Demonstração local" : "Microsoft Entra ID"],
+
               ["Política padrão", "Negar acesso"],
             ],
           },

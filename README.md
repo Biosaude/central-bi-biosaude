@@ -78,8 +78,17 @@ docs/
   validation.md                      # resultados da execução
 ```
 
-## Escopo e próxima fase
+## Histórico da demonstração local
 
-Veja [arquitetura e segurança](docs/architecture.md) e [resultados dos testes](docs/validation.md). A Fase 3 depende de autorização: OIDC real, sessões, enforcement de concessões por usuário e migração para PostgreSQL/Neon ainda não foram implementados. Os outros três repositórios não são dependências e não foram alterados.
+Veja [arquitetura e segurança](docs/architecture.md) e [resultados dos testes](docs/validation.md). Esses documentos registram a entrega da Fase 2. A seção seguinte descreve o modo corporativo da Fase 4D. Os outros três repositórios não são dependências da Central.
 
 Trabalho na branch `feat/central-bi-portal`. Sem PR, merge, deploy ou alteração da `main`.
+
+## Modo corporativo da Fase 4D
+
+O modo corporativo é ativado com `PORTAL_AUTH_MODE=entra` e usa PostgreSQL. O demonstrativo SQLite continua disponível para desenvolvimento local. Configure `DATABASE_URL`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` e `ENTRA_REDIRECT_URI` no servidor. O retorno registrado no Entra deve apontar para `/api/auth/callback` no endereço canônico do portal, com HTTPS em homologação. Em testes locais, o retorno pode usar `http://localhost`.
+
+1. Para validação local, aponte `DATABASE_URL` para um PostgreSQL 18 descartável e execute `npm run db:migrate:postgres`. O executor registra cada migração com checksum e sua reexecução preserva o esquema aplicado.
+2. Vincule o primeiro administrador com `npm run db:bootstrap:admin`, usando `ENTRA_TENANT_ID`, `BOOTSTRAP_ENTRA_OBJECT_ID`, `BOOTSTRAP_ADMIN_NAME` e `BOOTSTRAP_ADMIN_EMAIL`. O comando atua apenas se não houver outro administrador ativo no tenant. Depois, use **Usuários e permissões** para cadastrar os vínculos e conceder leitura por dashboard.
+3. No modo corporativo, a identidade é o par `tid` e `oid`. A sessão opaca expira em até 8 horas e também após 30 minutos de inatividade. O logout encerra a sessão da Central. Administrações de acesso e alterações de dashboard são auditadas. O papel administrativo dá acesso à gestão, e a leitura de cada dashboard depende da respectiva concessão.
+4. Testes de PostgreSQL em `npm test` usam `PG_TEST_DATABASE_URL` (banco `central_bi_local`) e `PG_AUTH_TEST_DATABASE_URL` (banco `central_bi_auth_local`). O cenário corporativo de `npm run test:e2e` usa `PG_CORPORATE_E2E_DATABASE_URL` (banco `central_bi_e2e_local`). Use bancos vazios e descartáveis em `127.0.0.1` a cada execução. O login é verificado com provedor simulado nos testes OIDC e a sessão é criada com identidades sintéticas no Playwright.

@@ -1738,3 +1738,25 @@ td strong {
     transition: none !important;
   }
 }
+
+.access-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+}
+.access-form label {
+  display: grid;
+  gap: 4px;
+}
+.access-form input,
+.access-form select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #d9d9df;
+  border-radius: 6px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}

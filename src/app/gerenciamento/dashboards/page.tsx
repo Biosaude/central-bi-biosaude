@@ -1,10 +1,11 @@
+import { Denied } from "@/components/access-denied";
 import { DashboardManager } from "@/components/dashboard-manager";
-import { PageHeading, DemoNotice, Denied } from "@/components/ui";
-import { localDemoAllowed } from "@/lib/page-access";
-import { getRepository } from "@/lib/sqlite";
+import { PageHeading, DemoNotice } from "@/components/ui";
+import { canManage, portalAccess, portalDashboards } from "@/lib/page-access";
 export const metadata = { title: "Gerenciar dashboards" };
 export default async function ManageDashboardsPage() {
-  if (!(await localDemoAllowed())) return <Denied />;
+  const access = await portalAccess();
+  if (!canManage(access)) return <Denied />;
   return (
     <>
       <PageHeading
@@ -12,9 +13,9 @@ export default async function ManageDashboardsPage() {
         title="Gerenciar dashboards"
         description="Cadastre, edite e organize os módulos da sua central."
       />
-      <DashboardManager dashboards={getRepository().list(true)} />
+      <DashboardManager dashboards={await portalDashboards(access, true)} />
       <div className="spacer" />
-      <DemoNotice />
+      {access.kind === "demo" && <DemoNotice />}
     </>
   );
 }
