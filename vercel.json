@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "homologacao/pacote-windows": false
+    }
+  }
+}
