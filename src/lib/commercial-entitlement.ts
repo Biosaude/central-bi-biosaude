@@ -36,6 +36,10 @@ const respond = (status: number, body: { allowed: boolean } | { error: string })
   Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 const unauthorized = () => respond(401, { error: "invalid_assertion" });
 
+function logEntitlementFailure(service: Service, reason: "configuration" | "origin" | "key_id" | "assertion" | "database") {
+  console.warn(JSON.stringify({ event: "central_dashboard_entitlement_failure", service: service.issuer, reason }));
+}
+
 async function settings(env: Record<string, string | undefined>, service: Service) {
   const audience = new URL(env[service.prefix + "ENTITLEMENT_URL"] ?? "");
   const local = !["preview", "production"].includes(env.VERCEL_ENV ?? "") &&
@@ -81,16 +85,23 @@ async function handleEntitlement(
   try {
     config = await settings(env, service);
   } catch {
+    logEntitlementFailure(service, "configuration");
     return respond(503, { error: "unavailable" });
   }
   const target = new URL(request.url);
-  if (target.origin !== config.audience.origin || target.pathname !== service.path) return unauthorized();
+  if (target.origin !== config.audience.origin || target.pathname !== service.path) {
+    logEntitlementFailure(service, "origin");
+    return unauthorized();
+  }
   if (target.search) return respond(400, { error: "invalid_request" });
 
   let assertion: CommercialEntitlementAssertion;
   try {
     const header = headerSchema.parse(decodeProtectedHeader(token));
-    if (header.kid !== config.keyId) return unauthorized();
+    if (header.kid !== config.keyId) {
+      logEntitlementFailure(service, "key_id");
+      return unauthorized();
+    }
     const { payload } = await jwtVerify(token, config.key, {
       algorithms: [algorithm],
       issuer: service.issuer,
@@ -109,6 +120,7 @@ async function handleEntitlement(
       expiresAt: claims.exp,
     };
   } catch {
+    logEntitlementFailure(service, "assertion");
     return unauthorized();
   }
 
@@ -128,6 +140,7 @@ async function handleEntitlement(
     if (!decision.accepted) return unauthorized();
     return respond(200, { allowed: decision.allowed });
   } catch {
+    logEntitlementFailure(service, "database");
     return respond(503, { error: "unavailable" });
   }
 }

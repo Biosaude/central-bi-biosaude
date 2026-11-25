@@ -41,3 +41,18 @@ Na janela expressamente autorizada, confira a identidade do Neon operacional por
 O projeto `central-bi-biosaude` (`square-pine-83153325`) tem PostgreSQL 18, branch `production` (`br-late-pond-b6iza9hq`), endpoint direto `ep-withered-fog-b6e2x9ca.c-2.sa-east-1.aws.neon.tech` e banco `neondb`, de propriedade de `neondb_owner`. O inventário indicou ausência de `central_bi_migrator` e `central_bi_runtime`. A API não confirma o conteúdo do banco.
 
 Na janela autorizada, confirme por leitura os schemas, objetos, ACLs e o uso dedicado do banco. Execute `db/operations/production-provision.sql` via `psql` com a credencial administrativa existente e `PGSSLMODE=verify-full`. Qualquer divergência de destino, proprietário ou objetos interrompe o provisionamento. O script prepara os logins sem senha. Provisione credenciais distintas pelo cofre ou pelo prompt interativo `\password` antes de rodar 001–003 e aplicar `production-runtime.sql`. Nenhum projeto ou banco adicional é necessário para esse provisionamento.
+
+## Aceite corporativo consolidado
+
+Abra o alias canônico de cada Preview informado pelo inventário e inicie a ação de login na própria página. Em URLs individuais reconhecidas por `VERCEL_URL`, a retomada envia somente à raiz canônica. O callback, a sessão e as APIs seguem restritos ao alias. Verifique que uma URL individual ou um callback de origem divergente continua sem acesso a dados.
+
+Na mesma janela, acompanhe os eventos `*_corporate_auth_failure` do dashboard e `central_dashboard_entitlement_failure` da Central. Essas linhas contêm somente a etapa, um motivo fixo e metadados técnicos, como nome da variável ou status do upstream. Use o primeiro ponto de falha para agir sem repetir o inventário:
+
+| Etapa registrada | Conferência única |
+|---|---|
+| `configuration` | Conferir o nome indicado e seu escopo exato no deployment. A origem é HTTPS, sem caminho ou query. O callback registrado no Entra é a origem canônica mais o caminho documentado. |
+| `entra_discovery` / `entra_callback` | Conferir tenant, acesso HTTPS à descoberta, callback Web exato e cliente Entra. `client_rejected` indica rejeição da autenticação do cliente pelo provedor. |
+| `redis` | Conferir URL REST e token do dashboard. Para `SET`, `GET` e `GETDEL`, conferir o namespace calculado pelo inventário e a ACL do token. |
+| `central` | Conferir o status recebido e o evento correspondente na Central. Se a chamada não chegou à aplicação, conferir Deployment Protection e o acesso de serviço existente. Se chegou, o evento distingue audiência, identificador de chave, asserção e acesso ao banco. Um `200` com `allowed:false` é decisão de concessão, com revisão de tenant, objeto, módulo e conta no banco correto. |
+
+Em uma passagem com contas sintéticas, validar login e leitura, negar acesso direto com credencial legada, revogar a concessão com o cookie ainda ativo e comprovar a negação na próxima leitura. Conferir uma publicação administrativa e uma exportação por dashboard, além dos hosts legados, antes de habilitar o catálogo. A janela de Production continua sujeita à autorização expressa e à proteção dos deployments antigos.
