@@ -1,0 +1,58 @@
+# Publicação corporativa dos três dashboards
+
+A Central continua sendo a fonte de concessões por `tid` e `oid`. Cada aplicação mantém sua sessão e consulta a Central a cada operação protegida. Os serviços conservam as asserções Ed25519 independentes e a prevenção de replay. O Limite continua exigindo JWT Neon e autorização de workspace em RLS. Uma concessão de leitura continua insuficiente para publicar.
+
+## Configuração em uma única janela
+
+Conferir por metadados os quatro projetos, domínios, branches de Production, deploys antigos alcançáveis e segredos por ambiente. A Central ainda não tem `main` remoto na referência analisada. Usar a branch de Production confirmada na Vercel. Nenhum segredo deve constar no material de revisão ou sair do cofre. Usar o inventário de nomes da [homologação](homologacao-dashboards.md) como base, aplicando os ajustes abaixo.
+
+| Aplicação | Configuração operacional |
+|---|---|
+| Central | `PORTAL_AUTH_MODE=entra`, parâmetros Entra existentes e `ENTRA_REDIRECT_URI` no domínio definitivo com `/api/auth/callback`. `PORTAL_PRODUCTION_DATABASE_HOST`, `PORTAL_PRODUCTION_DATABASE_NAME` se diferente de `neondb`, e `DATABASE_URL` do runtime com TLS verify-full. No executor autorizado, `PORTAL_DATABASE_ENV=production` e `MIGRATION_DATABASE_URL` do migrador. Conferir o histórico 001–003 e grants equivalentes aos já ensaiados para sessões, concessões, auditoria e replay. Validar administrador existente ou usar o bootstrap por identificadores imutáveis. Os três grupos de URL de concessão e ID/chave pública Ed25519 devem corresponder à origem do callback e aos serviços de Production. |
+| Comercial | `COMMERCIAL_PRODUCTION_ORIGIN` com o domínio oficial e callback `/api/corporate-auth/callback`. `SUPABASE_URL`, chave publicável, `COMMERCIAL_PRODUCTION_SUPABASE_REF`, `COMMERCIAL_PRODUCTION_READER_DATABASE_URL` e `COMMERCIAL_PRODUCTION_PUBLISHER_DATABASE_URL`. As duas conexões usam TLS verify-full e papéis diferentes. Provisionar os logins restritos pelo cofre, conferir ACLs, aplicar a operação versionada `supabase/operations/commercial-production-access.sql` no destino identificado e manter a verificação do administrador Supabase. |
+| Retenção | `RETENTION_PRODUCTION_ORIGIN` e mesmo caminho de callback corporativo. `RETENTION_PRODUCTION_SUPABASE_REF` fixa a base operacional já usada em `SUPABASE_URL`. Manter a chave publicável e a credencial de serviço exclusivamente no uso previsto. Confirmar e aplicar, se necessário, a operação versionada `supabase/operations/retention-production-access.sql`. |
+| Limite | `GLOBAL_LIMIT_PRODUCTION_ORIGIN` com o callback corporativo e origem compatível com o proxy de Neon Auth. `GLOBAL_LIMIT_PRODUCTION_NEON_HOST` e `DATABASE_URL` com runtime `biosaude_runtime_prod` e verify-full. Usar as variáveis e flags existentes de Neon Auth e API financeira e manter o fallback local desativado. Preparar `GLOBAL_LIMIT_PRODUCTION_IDENTITY_BINDINGS` com pares únicos de `tenantId`, `objectId` e `subject` verificado, sem copiar os vínculos sintéticos. Preservar as políticas RLS e conferir os grants e o limite de workspace por metadados. |
+
+Cadastrar os quatro callbacks exatos com o Entra. Reusar Upstash com três credenciais restritas e chaves de produção por dashboard e origem. O prefixo segue `comercial:production:`, `retention:production:` ou `global-limit:production:`, seguido do SHA-256 da origem canônica sem barra final e dos segmentos `:login:` e `:session:`. Usar GET, GETDEL, DEL e SET com NX e EX. Usar pares Ed25519 independentes por dashboard no escopo Production. O Preview preserva os nomes e os prefixos existentes.
+
+## Ordem de corte e aceite
+
+1. Aprovar em conjunto a janela, os destinos e as operações. Ensaiar somente as fronteiras novas em fixtures locais ou destinos sintéticos já autorizados. Validar callbacks, sessões, revogação e proteção das implantações antigas. Nenhum dado de negócio real entra em homologação.
+2. Manter o catálogo sem origens operacionais. Preparar banco e endpoints da Central primeiro e aplicar os controles de ACL aos destinos autorizados durante a janela. Publicar os dashboards com a fronteira corporativa obrigatória. Fechar aliases antigos e caminhos para implantações Vercel que ainda executem código legado, sem reabrir RPCs. Se uma implantação pública antiga ainda tiver acesso às bases, interromper o aceite e resolver a proteção do deployment ou o isolamento da credencial server-side antes de liberar.
+3. Exigir negação em URLs diretas, APIs, RPCs, views, paginação e exportações sem sessão ou sem concessão, inclusive com credencial válida do sistema original. Com a sessão ainda ativa, revogar a concessão e verificar que a próxima solicitação falha. Exigir falha fechada quando Central ou Redis ficar indisponível. Confirmar que só a identidade financeira vinculada acessa seu workspace.
+4. Confirmar com contas sintéticas os fluxos de leitura, atualização, publicação administrativa e exportação. A leitura corporativa sem função administrativa deve continuar sem permissão de publicação. Ativar os três `*_PRODUCTION_ORIGIN` do catálogo apenas após o aceite acima. Registrar os SHAs e as evidências sem dados sensíveis.
+5. Se um teste falhar, manter o dashboard fora do catálogo. Reverter apenas para versões e configurações que preservem a negação direta. A revogação impede novas leituras e exportações. Arquivos já entregues a um usuário não podem ser recolhidos por esse controle.
+
+## Comandos de preparação
+
+No executor autorizado, defina as quatro origens `CENTRAL_RELEASE_ORIGIN`, `COMMERCIAL_RELEASE_ORIGIN`, `RETENTION_RELEASE_ORIGIN` e `GLOBAL_LIMIT_RELEASE_ORIGIN`. Rode `node scripts/inventario-publicacao.mjs --plano` para gerar os callbacks e padrões Redis sem credenciais. Para inventariar Vercel, use o mesmo script com `--vercel`, IDs `VERCEL_{CENTRAL,COMMERCIAL,RETENTION,GLOBAL_LIMIT}_PROJECT_ID` e SHAs completos `{CENTRAL,COMMERCIAL,RETENTION,GLOBAL_LIMIT}_RELEASE_SHA`. Forneça `VERCEL_TOKEN` pelo cofre com autorização de leitura e `VERCEL_TEAM_ID` se exigido pela conta. O relatório contém somente metadados. Todo deployment com SHA desconhecido ou diferente do aprovado entra na revisão, inclusive os hosts individuais e os aliases.
+
+Na janela expressamente autorizada, confira a identidade do Neon operacional por metadados, execute a migração da Central com o executor previsto e use `db/operations/production-runtime.sql` para conceder os privilégios. Passe `approved_host` e `approved_database` ao `psql`. Use `PGSSLMODE=verify-full` e a credencial do migrador pelo cofre. O SQL bloqueia os endpoints sintéticos conhecidos e exige sessão TLS no destino aprovado. Antes dos scripts Supabase, use o inventário de objetos e ACLs para confirmar o projeto, o host e as relações expostas; execute-os com `ON_ERROR_STOP`.
+
+## Se Deployment Protection não cobrir todo o histórico
+
+- **Comercial.** As revogações no Supabase fecham as leituras e publicações legadas com papel de navegador. Confira os builds antigos, incluindo eventuais dados incorporados no SSR ou conteúdo em cache. A ACL do banco não protege conteúdo que a implantação já contém.
+- **Retenção.** A ACL Supabase bloqueia o navegador, enquanto um deployment antigo que ainda usa a credencial de serviço pode ler pelo backend. Se a conta oferecer chaves secretas revogáveis, identifique os consumidores, configure uma chave dedicada à versão corporativa e revogue a predecessora na janela, somente quando a versão nova estiver pronta e houver caminho de reversão seguro. Se a chave antiga for um JWT legado, não rotacione a chave de assinatura sem inventário e aprovação do efeito sobre Auth e outros consumidores. A prova é a falha do host antigo com sessão Supabase válida e a continuidade da versão corporativa.
+- **Limite.** Se o backend antigo e o novo usarem o mesmo login Neon, prepare a troca da senha desse papel na janela. Entregue a credencial apenas às implantações aprovadas e confirme a invalidação das sessões PostgreSQL antigas desse runtime depois da troca, com procedimento do operador. A prova é a negação no deployment antigo com JWT válido e a continuidade do novo com vínculo e RLS. Preserve roles, schemas e dados.
+- Se um deployment histórico continuar acessível com dados embutidos, cache ou uma credencial que a organização não conseguir invalidar seletivamente, mantenha o catálogo desligado até comprovar uma proteção efetiva para esse host. Um alias atualizado, por si só, deixa URLs individuais potencialmente acessíveis. Nunca reverta para um deployment que reabra esses caminhos.
+
+## Neon operacional confirmado na API de gerenciamento
+
+O projeto `central-bi-biosaude` (`square-pine-83153325`) tem PostgreSQL 18, branch `production` (`br-late-pond-b6iza9hq`), endpoint direto `ep-withered-fog-b6e2x9ca.c-2.sa-east-1.aws.neon.tech` e banco `neondb`, de propriedade de `neondb_owner`. O inventário indicou ausência de `central_bi_migrator` e `central_bi_runtime`. A API não confirma o conteúdo do banco.
+
+Na janela autorizada, confirme por leitura os schemas, objetos, ACLs e o uso dedicado do banco. Execute `db/operations/production-provision.sql` via `psql` com a credencial administrativa existente e `PGSSLMODE=verify-full`. Qualquer divergência de destino, proprietário ou objetos interrompe o provisionamento. O script prepara os logins sem senha. Provisione credenciais distintas pelo cofre ou pelo prompt interativo `\password` antes de rodar 001–003 e aplicar `production-runtime.sql`. Nenhum projeto ou banco adicional é necessário para esse provisionamento.
+
+## Aceite corporativo consolidado
+
+Abra o alias canônico de cada Preview informado pelo inventário e inicie a ação de login na própria página. Em URLs individuais reconhecidas por `VERCEL_URL`, a retomada envia somente à raiz canônica. O callback, a sessão e as APIs seguem restritos ao alias. Verifique que uma URL individual ou um callback de origem divergente continua sem acesso a dados.
+
+Na mesma janela, acompanhe os eventos `*_corporate_auth_failure` do dashboard e `central_dashboard_entitlement_failure` da Central. Essas linhas contêm somente a etapa, um motivo fixo e metadados técnicos, como nome da variável ou status do upstream. Use o primeiro ponto de falha para agir sem repetir o inventário:
+
+| Etapa registrada | Conferência única |
+|---|---|
+| `configuration` | Conferir o nome indicado e seu escopo exato no deployment. A origem é HTTPS, sem caminho ou query. O callback registrado no Entra é a origem canônica mais o caminho documentado. |
+| `entra_discovery` / `entra_callback` | Conferir tenant, acesso HTTPS à descoberta, callback Web exato e cliente Entra. `client_rejected` indica rejeição da autenticação do cliente pelo provedor. |
+| `redis` | Conferir URL REST e token do dashboard. Para `SET`, `GET` e `GETDEL`, conferir o namespace calculado pelo inventário e a ACL do token. |
+| `central` | Conferir o status recebido e o evento correspondente na Central. Se a chamada não chegou à aplicação, conferir Deployment Protection e o acesso de serviço existente. Se chegou, o evento distingue audiência, identificador de chave, asserção e acesso ao banco. Um `200` com `allowed:false` é decisão de concessão, com revisão de tenant, objeto, módulo e conta no banco correto. |
+
+Em uma passagem com contas sintéticas, validar login e leitura, negar acesso direto com credencial legada, revogar a concessão com o cookie ainda ativo e comprovar a negação na próxima leitura. Conferir uma publicação administrativa e uma exportação por dashboard, além dos hosts legados, antes de habilitar o catálogo. A janela de Production continua sujeita à autorização expressa e à proteção dos deployments antigos.

@@ -9,6 +9,7 @@ export function corporateSettings() {
   const settings = readEntraSettings();
   const redirect = new URL(settings.redirectUri);
   const secure = redirect.protocol === "https:";
+  if (process.env.VERCEL_ENV === "production" && !secure) throw new Error("O callback de Production exige HTTPS.");
   if ((!secure && !(redirect.protocol === "http:" && redirect.hostname === "localhost")) ||
       redirect.pathname !== "/api/auth/callback" ||
       redirect.username || redirect.password || redirect.search || redirect.hash) {

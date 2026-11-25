@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 import { manageAccess } from "../../src/lib/postgres/administration";
+import { checkCommercialEntitlement, commercialDashboardSlug } from "../../src/lib/postgres/commercial-entitlement";
 import { PostgresDashboardRepository } from "../../src/lib/postgres/dashboards";
 import { PostgresIdentity, tokenHash } from "../../src/lib/postgres/identity";
 import { migratePostgres } from "../../src/lib/postgres/migrations";
@@ -52,6 +54,42 @@ it.skipIf(!migration || !runtime)("executa com privilégios mínimos e bloqueia 
       .resolves.toMatchObject({ id: created.id, active: false });
     await manageAccess(pool, hash, tenantId, { action: "revoke", userId: firstUserId });
     expect(await identity.revalidate(viewer!, tenantId)).toBeNull();
+    const commercial = await dashboards.create({ ...initial, slug: commercialDashboardSlug }, "fixture");
+    const commercialGrant = { action: "grant" as const, userId: firstUserId, dashboardId: commercial.id };
+    const assertion = (objectId = firstObjectId) => ({
+      tenantId, objectId, jti: randomUUID(), expiresAt: Math.floor(Date.now() / 1000) + 30,
+    });
+    const lookup = (objectId?: string) => checkCommercialEntitlement(pool, assertion(objectId));
+
+    expect(await lookup()).toEqual({ accepted: true, allowed: false });
+    expect(await lookup(adminObjectId)).toEqual({ accepted: true, allowed: false });
+    await manageAccess(pool, hash, tenantId, { ...commercialGrant, granted: true });
+    const oneTime = assertion();
+    const simultaneous = await Promise.all([
+      checkCommercialEntitlement(pool, oneTime), checkCommercialEntitlement(pool, oneTime),
+    ]);
+    expect(simultaneous.filter(({ accepted }) => accepted)).toEqual([{ accepted: true, allowed: true }]);
+    expect(simultaneous.filter(({ accepted }) => !accepted)).toEqual([{ accepted: false, allowed: false }]);
+
+    await fixture.pool.query("UPDATE central_bi.users SET enabled=false WHERE id=$1", [firstUserId]);
+    expect(await lookup()).toEqual({ accepted: true, allowed: false });
+    await fixture.pool.query("UPDATE central_bi.users SET enabled=true WHERE id=$1", [firstUserId]);
+    await dashboards.update(commercial.id, { ...initial, slug: commercialDashboardSlug, active: false }, "fixture");
+    expect(await lookup()).toEqual({ accepted: true, allowed: false });
+    await dashboards.update(commercial.id, { ...initial, slug: commercialDashboardSlug }, "fixture");
+    expect(await lookup()).toEqual({ accepted: true, allowed: true });
+    await manageAccess(pool, hash, tenantId, { ...commercialGrant, granted: false });
+    expect(await lookup()).toEqual({ accepted: true, allowed: false });
+
+    const expired = { ...assertion(), expiresAt: Math.floor(Date.now() / 1000) - 1 };
+    await fixture.pool.query(
+      "INSERT INTO central_bi.commercial_entitlement_assertions VALUES ($1, to_timestamp($2))",
+      [expired.jti, expired.expiresAt],
+    );
+    expect(await checkCommercialEntitlement(pool, expired)).toEqual({ accepted: false, allowed: false });
+    expect((await fixture.pool.query(
+      "SELECT 1 FROM central_bi.commercial_entitlement_assertions WHERE jti=$1", [expired.jti],
+    )).rowCount).toBe(0);
     await identity.logout(admin!);
     expect(await identity.revalidate(admin!, tenantId)).toBeNull();
 
@@ -66,6 +104,8 @@ it.skipIf(!migration || !runtime)("executa com privilégios mínimos e bloqueia 
       "SELECT * FROM central_bi.audit_logs", "UPDATE central_bi.audit_logs SET actor='x'",
       "DELETE FROM central_bi.audit_logs", "SELECT * FROM central_bi.schema_migrations",
       "UPDATE central_bi.users SET entra_object_id=NULL", "SET ROLE central_bi_migrator",
+      "SELECT jti FROM central_bi.commercial_entitlement_assertions",
+      "UPDATE central_bi.commercial_entitlement_assertions SET expires_at=now()",
     ]) {
       await expect(pool.query(denied)).rejects.toMatchObject({ code: "42501" });
     }

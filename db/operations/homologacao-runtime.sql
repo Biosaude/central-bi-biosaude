@@ -50,6 +50,9 @@ GRANT INSERT (token_hash, user_id, expires_at, idle_expires_at),
 GRANT INSERT (token_hash, state, nonce, code_verifier, expires_at), DELETE
     ON central_bi.login_attempts TO central_bi_runtime;
 
+GRANT SELECT (expires_at), INSERT (jti, expires_at), DELETE
+    ON central_bi.commercial_entitlement_assertions TO central_bi_runtime;
+
 GRANT INSERT (actor, action, entity_id, details) ON central_bi.audit_logs TO central_bi_runtime;
 
 COMMIT;
