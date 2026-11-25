@@ -38,7 +38,7 @@ const unauthorized = () => respond(401, { error: "invalid_assertion" });
 
 async function settings(env: Record<string, string | undefined>, service: Service) {
   const audience = new URL(env[service.prefix + "ENTITLEMENT_URL"] ?? "");
-  const local = env.VERCEL_ENV !== "preview" &&
+  const local = !["preview", "production"].includes(env.VERCEL_ENV ?? "") &&
     audience.hostname === "localhost" && audience.protocol === "http:";
   const tenantId = env.ENTRA_TENANT_ID?.toLowerCase();
   const keyId = env[service.prefix + "ASSERTION_KEY_ID"];
@@ -48,6 +48,12 @@ async function settings(env: Record<string, string | undefined>, service: Servic
       !tenantId || !entraIdPattern.test(tenantId) ||
       !keyId || !publicKey?.startsWith("-----BEGIN PUBLIC KEY-----")) {
     throw new Error("Configuração de concessão comercial inválida.");
+  }
+
+  if (env.VERCEL_ENV === "production") {
+    const callback = new URL(env.ENTRA_REDIRECT_URI ?? "");
+    if (callback.href !== new URL("/api/auth/callback", audience).href)
+      throw new Error("A audiência de Production deve usar a origem canônica do portal.");
   }
 
   const key = await importSPKI(publicKey, algorithm);
@@ -61,7 +67,7 @@ async function handleEntitlement(
   lookup: Lookup,
   env: Record<string, string | undefined> = process.env,
 ): Promise<Response> {
-  if (env.PORTAL_AUTH_MODE !== "entra" || env.VERCEL_ENV === "production" || !env[service.prefix + "ENTITLEMENT_URL"]) {
+  if (env.PORTAL_AUTH_MODE !== "entra" || !env[service.prefix + "ENTITLEMENT_URL"]) {
     return respond(404, { error: "not_found" });
   }
 

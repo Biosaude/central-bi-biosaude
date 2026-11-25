@@ -40,3 +40,16 @@ it("mantém a conexão local e nunca usa a URL da aplicação para migrar", asyn
     await pool.end();
   }
 });
+
+it("Production exige um Neon operacional explícito e rejeita alvos de homologação", async () => {
+  const productionHost = "ep-operacional.c-2.sa-east-1.aws.neon.tech";
+  const production = { VERCEL_ENV: "production", PORTAL_PRODUCTION_DATABASE_HOST: productionHost };
+  const runtime = url("central_bi_runtime").replace(host, productionHost);
+  const pool = createPostgresPool(runtime, "runtime", production);
+  expect(pool).toMatchObject({ options: { host: productionHost, ssl: { rejectUnauthorized: true } } });
+  await pool.end();
+  for (const target of [url("central_bi_runtime"), "postgres://postgres@localhost/local", runtime.replace("verify-full", "require")]) {
+    expect(() => createPostgresPool(target, "runtime", production)).toThrow();
+  }
+  expect(() => createPostgresPool(url("central_bi_runtime"), "runtime", { ...production, PORTAL_PRODUCTION_DATABASE_HOST: host })).toThrow();
+});

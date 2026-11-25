@@ -3,10 +3,20 @@ import { dashboardLaunch } from "../../src/lib/dashboard-launch";
 
 describe("destinos dos dashboards", () => {
   const preview = { VERCEL_ENV: "preview" };
-  it("mantém a abertura existente do Comercial fora de Preview", () => {
+  it("Production só abre origens oficiais explicitamente configuradas", () => {
     expect(dashboardLaunch("painel-comercial-r1", { VERCEL_ENV: "production",
       COMMERCIAL_PREVIEW_ORIGIN: "https://outro.example",
-    })?.href).toBe("https://movopainelcomercial.vercel.app/");
+    })).toBeUndefined();
+    for (const [slug, variable, host] of [
+      ["painel-comercial-r1", "COMMERCIAL_PRODUCTION_ORIGIN", "movopainelcomercial.vercel.app"],
+      ["retencao-faturamento", "RETENTION_PRODUCTION_ORIGIN", "reten-o-de-faturamento.vercel.app"],
+      ["limite-global-cliente", "GLOBAL_LIMIT_PRODUCTION_ORIGIN", "novolimiteglobalporcliente.vercel.app"],
+    ]) {
+      const url = `https://${host}/`;
+      const production = { VERCEL_ENV: "production", [variable]: url };
+      expect(dashboardLaunch(slug, production)).toMatchObject({ href: url, corporate: true, preview: false });
+      expect(dashboardLaunch(slug, { ...production, [variable]: "https://unapproved.invalid" })).toBeUndefined();
+    }
     expect(dashboardLaunch("retencao-faturamento", {})).toBeUndefined();
   });
 

@@ -97,11 +97,10 @@ describe("endpoint interno de concessão do Comercial", () => {
     expect(lookup).toHaveBeenCalledOnce();
   });
 
-  it("mantém o endpoint desligado em Production, no modo local e sem configuração", async () => {
+  it("mantém o endpoint desligado sem Entra ou sem destino", async () => {
     const token = await signAssertion();
     const lookup = vi.fn();
     for (const settings of [
-      { ...env, VERCEL_ENV: "production" },
       { ...env, PORTAL_AUTH_MODE: undefined },
       { ...env, CENTRAL_BI_ENTITLEMENT_URL: undefined },
     ]) {
@@ -139,4 +138,21 @@ describe("isolamento de concessões entre serviços", () => {
     expect((await handle(request(valid, audience), lookup, config)).status).toBe(200);
     expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ tenantId, objectId: firstObjectId }), slug);
   });
+});
+
+it("Production exige audiência HTTPS na origem do callback e reconsulta a concessão revogada", async () => {
+  const production = { ...env, VERCEL_ENV: "production", ENTRA_REDIRECT_URI: new URL("/api/auth/callback", endpoint).href };
+  const lookup = vi.fn().mockResolvedValueOnce({ accepted: true, allowed: true })
+    .mockResolvedValueOnce({ accepted: true, allowed: false });
+  const token = await signAssertion();
+  expect((await handleCommercialEntitlement(request(token), lookup,
+    { ...production, ENTRA_REDIRECT_URI: "https://other.invalid/api/auth/callback" })).status).toBe(503);
+  expect((await handleCommercialEntitlement(request(token), lookup,
+    { ...production, CENTRAL_BI_ENTITLEMENT_URL: "http://localhost/api/internal/commercial-entitlement" })).status).toBe(503);
+  expect(lookup).not.toHaveBeenCalled();
+  for (const allowed of [true, false]) {
+    const response = await handleCommercialEntitlement(request(await signAssertion()), lookup, production);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ allowed });
+  }
 });

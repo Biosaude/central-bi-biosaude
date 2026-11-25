@@ -39,6 +39,8 @@ export default async function DashboardPage({
           <>
             {launch.preview ? (
               <p>O aplicativo de homologação verifica a sessão corporativa e a concessão de leitura.</p>
+            ) : launch.corporate ? (
+              <p>O dashboard verifica a sessão corporativa e a concessão individual de leitura.</p>
             ) : (
               <p>
                 A concessão da Central controla a abertura por esta página. A URL

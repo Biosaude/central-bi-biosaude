@@ -9,17 +9,18 @@ const destinations: Readonly<Record<string, { variable: string; publicHost: stri
 export function dashboardLaunch(
   slug: string,
   env: Record<string, string | undefined> = process.env,
-): { href: string; label: string; preview: boolean } | undefined {
+): { href: string; label: string; preview: boolean; corporate?: boolean } | undefined {
   if (!Object.hasOwn(destinations, slug)) return;
   const { variable, label, publicHost } = destinations[slug];
-  if (env.VERCEL_ENV !== "preview")
+  const production = env.VERCEL_ENV === "production";
+  if (!production && env.VERCEL_ENV !== "preview")
     return slug === "painel-comercial-r1" ? { href: publicCommercial, label, preview: false } : undefined;
 
-  const configured = env[variable];
+  const configured = env[production ? variable.replace("PREVIEW", "PRODUCTION") : variable];
   if (!configured || !/^https:\/\/[a-z0-9.-]+\/?$/i.test(configured)) return;
   const url = URL.parse(configured);
   if (!url || !url.hostname.includes(".") ||
       !url.hostname.replace(/\.$/, "").split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)) ||
-      url.hostname.replace(/\.$/, "") === publicHost) return;
-  return { href: url.href, label, preview: true };
+      (production ? url.hostname !== publicHost || url.port : url.hostname.replace(/\.$/, "") === publicHost)) return;
+  return { href: url.href, label, preview: !production, ...(production ? { corporate: true } : {}) };
 }
